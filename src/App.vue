@@ -1,10 +1,13 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
+import { marked } from 'marked'
 import systemVoices from './assets/voices/system_voice.json'
 
 // 响应式数据
 const showSettings = ref(false)
 const showVoiceModal = ref(false)
+const showChangelog = ref(false)
+const changelogContent = ref('')
 const isLoading = ref(false)
 const audioUrl = ref('')
 const audioBlob = ref(null)
@@ -118,6 +121,12 @@ const estimatedCost = computed(() => {
 // 计算属性：进度描述
 const progressLabel = computed(() => {
   return `正在处理第 ${receivedChunks.value} 块 / 预计 ${expectedChunks.value} 块`
+})
+
+// 计算属性：渲染后的更新日志HTML
+const renderedChangelog = computed(() => {
+  if (!changelogContent.value) return ''
+  return marked(changelogContent.value)
 })
 
 // 页面初始化
@@ -614,6 +623,29 @@ function estimateUsageCharacters(text) {
   }
   return count
 }
+
+// 加载更新日志
+async function loadChangelog() {
+  try {
+    const response = await fetch('/CHANGELOG.md')
+    if (response.ok) {
+      changelogContent.value = await response.text()
+    } else {
+      changelogContent.value = '# 更新日志\n\n暂无更新日志内容。'
+    }
+  } catch (error) {
+    console.error('加载更新日志失败:', error)
+    changelogContent.value = '# 更新日志\n\n加载更新日志失败，请稍后重试。'
+  }
+}
+
+// 打开更新日志模态框
+async function openChangelog() {
+  if (!changelogContent.value) {
+    await loadChangelog()
+  }
+  showChangelog.value = true
+}
 </script>
 
 <template>
@@ -624,8 +656,13 @@ function estimateUsageCharacters(text) {
         <div class="flex-1">
           <h1 class="text-xl font-bold">MiniMax T2A Web UI</h1>
         </div>
-        <div class="flex-none">
-          <button class="btn btn-ghost btn-circle" @click="showSettings = true">
+        <div class="flex-none gap-2">
+          <button class="btn btn-ghost btn-circle" @click="openChangelog" title="更新日志">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </button>
+          <button class="btn btn-ghost btn-circle" @click="showSettings = true" title="设置">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1203,6 +1240,30 @@ function estimateUsageCharacters(text) {
         </div>
       </div>
     </div>
+
+    <!-- 更新日志模态框 -->
+    <div class="modal" :class="{ 'modal-open': showChangelog }">
+      <div class="modal-box max-w-4xl max-h-[80vh]">
+        <h3 class="font-bold text-xl mb-4 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          更新日志
+        </h3>
+        
+        <div class="overflow-y-auto max-h-[60vh]">
+          <div v-if="changelogContent" v-html="renderedChangelog" class="markdown-content"></div>
+          <div v-else class="flex items-center justify-center py-8">
+            <span class="loading loading-spinner loading-md mr-2"></span>
+            <span>正在加载更新日志...</span>
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost text-base" @click="showChangelog = false">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1283,5 +1344,136 @@ function estimateUsageCharacters(text) {
 /* 权重总和提示样式 */
 .weight-summary {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+
+/* Markdown 内容样式 */
+.markdown-content {
+  color: hsl(var(--bc));
+  line-height: 1.7;
+}
+
+.markdown-content h1 {
+  font-size: 2.25rem;
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  margin-top: 2rem;
+  color: hsl(var(--p));
+  border-bottom: 3px solid hsl(var(--p));
+  padding-bottom: 0.75rem;
+  background: linear-gradient(135deg, hsl(var(--p)) 0%, hsl(var(--s)) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 4px hsl(var(--p) / 0.1);
+}
+
+.markdown-content h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  margin-top: 2rem;
+  color: hsl(var(--p));
+  padding-left: 1rem;
+  border-left: 4px solid hsl(var(--p));
+  background: hsl(var(--p) / 0.05);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  position: relative;
+}
+
+.markdown-content h2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, hsl(var(--p)), hsl(var(--s)));
+  border-radius: 0 0.25rem 0.25rem 0;
+}
+
+.markdown-content h3 {
+  font-size: 1.375rem;
+  font-weight: 650;
+  margin-bottom: 0.75rem;
+  margin-top: 1.5rem;
+  color: hsl(var(--s));
+  padding-left: 0.75rem;
+  border-left: 3px solid hsl(var(--s));
+  position: relative;
+}
+
+.markdown-content h3::before {
+  content: '▶';
+  position: absolute;
+  left: -0.5rem;
+  color: hsl(var(--s));
+  font-size: 0.75rem;
+}
+
+.markdown-content p {
+  margin-bottom: 1rem;
+}
+
+.markdown-content ul, .markdown-content ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+  color: hsl(var(--bc));
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content code {
+  background-color: hsl(var(--b2));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+}
+
+.markdown-content pre {
+  background-color: hsl(var(--b2));
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid hsl(var(--p));
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+  color: hsl(var(--bc) / 0.8);
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid hsl(var(--b3));
+  margin: 2rem 0;
+}
+
+.markdown-content a {
+  color: hsl(var(--p));
+  text-decoration: underline;
+}
+
+.markdown-content a:hover {
+  color: hsl(var(--pf));
 }
 </style>
