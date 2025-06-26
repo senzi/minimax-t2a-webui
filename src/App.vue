@@ -30,6 +30,8 @@ const t2aConfig = reactive({
 // 文本输入
 const inputText = ref('')
 const maxChars = 5000
+const textareaRef = ref(null)
+const isTextareaScrollable = ref(false)
 
 // 模型选项
 const modelOptions = [
@@ -340,6 +342,30 @@ function downloadAudio() {
   document.body.removeChild(link)
 }
 
+// 调整文本框高度
+function adjustTextareaHeight() {
+  if (!textareaRef.value) return
+  
+  const textarea = textareaRef.value
+  const maxHeight = 640 // 40rem = 640px
+  
+  // 重置高度以获取正确的 scrollHeight
+  textarea.style.height = 'auto'
+  
+  // 计算需要的高度
+  const scrollHeight = textarea.scrollHeight
+  
+  if (scrollHeight <= maxHeight) {
+    // 未达到最大高度，自动扩高，隐藏滚动条
+    textarea.style.height = scrollHeight + 'px'
+    isTextareaScrollable.value = false
+  } else {
+    // 达到最大高度，显示滚动条
+    textarea.style.height = maxHeight + 'px'
+    isTextareaScrollable.value = true
+  }
+}
+
 // 字符计数
 const charCount = computed(() => inputText.value.length)
 const isOverLimit = computed(() => charCount.value > maxChars)
@@ -348,17 +374,19 @@ const isOverLimit = computed(() => charCount.value > maxChars)
 <template>
   <div class="min-h-screen bg-base-100">
     <!-- 顶部标题栏 -->
-    <div class="navbar bg-base-200 shadow-sm">
-      <div class="flex-1">
-        <h1 class="text-xl font-bold">MiniMax T2A Web UI</h1>
-      </div>
-      <div class="flex-none">
-        <button class="btn btn-ghost btn-circle" @click="showSettings = true">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
+    <div class="navbar-wrapper">
+      <div class="navbar">
+        <div class="flex-1">
+          <h1 class="text-xl font-bold">MiniMax T2A Web UI</h1>
+        </div>
+        <div class="flex-none">
+          <button class="btn btn-ghost btn-circle" @click="showSettings = true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -374,20 +402,20 @@ const isOverLimit = computed(() => charCount.value > maxChars)
               <!-- 模型选择 -->
               <div class="form-control mb-4">
                 <label class="label">
-                  <span class="label-text">模型</span>
+                  <span class="label-text text-base">模型</span>
                 </label>
-                <div class="flex flex-wrap gap-2 mb-2">
+                <div class="grid grid-cols-2 gap-2 mb-2">
                   <button 
                     v-for="model in modelOptions" 
                     :key="model.id"
-                    class="btn btn-sm"
+                    class="btn btn-sm text-sm"
                     :class="t2aConfig.model === model.id ? 'btn-primary' : 'btn-outline'"
                     @click="t2aConfig.model = model.id"
                   >
                     {{ model.name }}
                   </button>
                 </div>
-                <div class="text-xs text-base-content/70 leading-relaxed">
+                <div class="text-sm text-base-content/70 leading-relaxed">
                   {{ modelOptions.find(m => m.id === t2aConfig.model)?.description }}
                 </div>
               </div>
@@ -395,74 +423,80 @@ const isOverLimit = computed(() => charCount.value > maxChars)
               <!-- 音色选择 -->
               <div class="form-control mb-4">
                 <label class="label">
-                  <span class="label-text">音色</span>
+                  <span class="label-text text-base">音色</span>
                 </label>
                 <button 
-                  class="btn btn-outline w-full justify-start text-left"
+                  class="btn btn-outline w-full justify-start text-left h-16 py-2"
                   @click="openVoiceModal"
                 >
-                  <div class="flex flex-col items-start">
-                    <div class="font-medium">{{ currentVoice.voice_name }}</div>
+                  <div class="flex flex-col items-start w-full">
+                    <div class="font-medium text-sm">{{ currentVoice.voice_name }}</div>
                     <div class="text-xs opacity-70">{{ currentVoice.voice_id }}</div>
                   </div>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
               </div>
 
               <!-- 语速 -->
-              <div class="form-control mb-4">
-                <label class="label">
-                  <span class="label-text">语速: {{ t2aConfig.speed }}</span>
+              <div class="form-control mb-6">
+                <label class="label py-3">
+                  <span class="label-text text-base">语速: {{ t2aConfig.speed }}</span>
                 </label>
-                <input type="range" min="0.5" max="2.0" step="0.1" 
-                       class="range range-primary" v-model.number="t2aConfig.speed">
-                <div class="w-full flex justify-between text-xs px-2">
-                  <span>0.5x</span>
-                  <span>1.0x</span>
-                  <span>2.0x</span>
+                <div class="px-3">
+                  <input type="range" min="0.5" max="2.0" step="0.1" 
+                         class="range range-primary my-2" v-model.number="t2aConfig.speed">
+                  <div class="w-full flex justify-between text-sm px-2 mt-2">
+                    <span>0.5x</span>
+                    <span>1.0x</span>
+                    <span>2.0x</span>
+                  </div>
                 </div>
               </div>
 
               <!-- 音量 -->
-              <div class="form-control mb-4">
-                <label class="label">
-                  <span class="label-text">音量: {{ t2aConfig.vol }}</span>
+              <div class="form-control mb-6">
+                <label class="label py-3">
+                  <span class="label-text text-base">音量: {{ t2aConfig.vol }}</span>
                 </label>
-                <input type="range" min="0.1" max="10" step="0.1" 
-                       class="range range-primary" v-model.number="t2aConfig.vol">
-                <div class="w-full flex justify-between text-xs px-2">
-                  <span>0.1</span>
-                  <span>5.0</span>
-                  <span>10</span>
+                <div class="px-3">
+                  <input type="range" min="0.1" max="10" step="0.1" 
+                         class="range range-primary my-2" v-model.number="t2aConfig.vol">
+                  <div class="w-full flex justify-between text-sm px-2 mt-2">
+                    <span>0.1</span>
+                    <span>5.0</span>
+                    <span>10</span>
+                  </div>
                 </div>
               </div>
 
               <!-- 音高 -->
-              <div class="form-control mb-4">
-                <label class="label">
-                  <span class="label-text">音高: {{ t2aConfig.pitch }}</span>
+              <div class="form-control mb-6">
+                <label class="label py-3">
+                  <span class="label-text text-base">音高: {{ t2aConfig.pitch }}</span>
                 </label>
-                <input type="range" min="-12" max="12" step="1" 
-                       class="range range-primary" v-model.number="t2aConfig.pitch">
-                <div class="w-full flex justify-between text-xs px-2">
-                  <span>-12</span>
-                  <span>0</span>
-                  <span>+12</span>
+                <div class="px-3">
+                  <input type="range" min="-12" max="12" step="1" 
+                         class="range range-primary my-2" v-model.number="t2aConfig.pitch">
+                  <div class="w-full flex justify-between text-sm px-2 mt-2">
+                    <span>-12</span>
+                    <span>0</span>
+                    <span>+12</span>
+                  </div>
                 </div>
               </div>
 
               <!-- 情感 -->
               <div class="form-control">
                 <label class="label">
-                  <span class="label-text">情感</span>
+                  <span class="label-text text-base">情感</span>
                 </label>
-                <div class="flex flex-wrap gap-2">
+                <div class="emotion-grid">
                   <button 
                     v-for="emotion in emotionOptions" 
                     :key="emotion.value"
-                    class="btn btn-sm"
+                    class="btn btn-sm text-sm"
                     :class="t2aConfig.emotion === emotion.value ? 'btn-primary' : 'btn-outline'"
                     @click="t2aConfig.emotion = emotion.value"
                   >
@@ -476,90 +510,93 @@ const isOverLimit = computed(() => charCount.value > maxChars)
 
         <!-- 右侧文本输入区域 -->
         <div class="lg:col-span-2">
-          <div class="card bg-base-200 shadow-sm h-full">
+          <div class="card bg-base-200 shadow-sm">
             <div class="card-body">
               <div class="flex justify-between items-center mb-4">
-                <h2 class="card-title text-lg">文本输入</h2>
-                <div class="text-sm" :class="{ 'text-error': isOverLimit }">
+                <h2 class="card-title text-xl">文本输入</h2>
+                <div class="text-base" :class="{ 'text-error': isOverLimit }">
                   {{ charCount }} / {{ maxChars }}
                 </div>
               </div>
               
               <textarea 
-                class="textarea textarea-bordered w-full h-64 resize-none"
-                :class="{ 'textarea-error': isOverLimit }"
+                ref="textareaRef"
+                class="textarea textarea-bordered w-full auto-resize-textarea text-lg leading-relaxed"
+                :class="{ 'textarea-error': isOverLimit, 'scrollable': isTextareaScrollable }"
                 placeholder="请输入要合成的文本内容..."
                 v-model="inputText"
                 :maxlength="maxChars"
+                @input="adjustTextareaHeight"
               ></textarea>
+
+              <!-- 合成按钮 -->
+              <div class="mt-6">
+                <button 
+                  class="btn btn-primary btn-lg text-lg w-full"
+                  :class="{ 'loading': isLoading }"
+                  :disabled="isLoading || !inputText.trim() || isOverLimit"
+                  @click="startSynthesis"
+                >
+                  {{ isLoading ? '合成中...' : '开始合成' }}
+                </button>
+              </div>
+
+              <!-- 进度条 -->
+              <div v-if="isLoading || progress > 0" class="mt-4">
+                <div class="mb-2">
+                  <span class="text-base">合成进度: {{ progress }}%</span>
+                </div>
+                <progress class="progress progress-primary w-full h-3" :value="progress" max="100"></progress>
+              </div>
+
+              <!-- 音频播放控件 -->
+              <div v-if="audioUrl" class="mt-6">
+                <div class="card bg-base-300 shadow-sm">
+                  <div class="card-body py-4">
+                    <div class="flex justify-between items-center mb-4">
+                      <h3 class="text-lg font-semibold">音频播放</h3>
+                      <button class="btn btn-success text-base" @click="downloadAudio">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        下载
+                      </button>
+                    </div>
+                    <audio controls class="w-full h-12" :src="audioUrl"></audio>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 合成按钮 -->
-      <div class="text-center mt-6">
-        <button 
-          class="btn btn-primary btn-lg"
-          :class="{ 'loading': isLoading }"
-          :disabled="isLoading || !inputText.trim() || isOverLimit"
-          @click="startSynthesis"
-        >
-          {{ isLoading ? '合成中...' : '开始合成' }}
-        </button>
-      </div>
-
-      <!-- 进度条 -->
-      <div v-if="isLoading || progress > 0" class="mt-6">
-        <div class="text-center mb-2">
-          <span class="text-sm">合成进度: {{ progress }}%</span>
-        </div>
-        <progress class="progress progress-primary w-full" :value="progress" max="100"></progress>
-      </div>
-
-      <!-- 音频播放控件 -->
-      <div v-if="audioUrl" class="mt-6">
-        <div class="card bg-base-200 shadow-sm">
-          <div class="card-body">
-            <div class="flex justify-between items-center">
-              <h3 class="text-lg font-semibold">音频播放</h3>
-              <button class="btn btn-success" @click="downloadAudio">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                下载
-              </button>
-            </div>
-            <audio controls class="w-full mt-4" :src="audioUrl"></audio>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- 设置模态框 -->
     <div class="modal" :class="{ 'modal-open': showSettings }">
       <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">API 配置</h3>
+        <h3 class="font-bold text-xl mb-4">API 配置</h3>
         
         <div class="form-control mb-4">
           <label class="label">
-            <span class="label-text">API Key</span>
+            <span class="label-text text-base">API Key</span>
           </label>
-          <input type="password" class="input input-bordered w-full" 
+          <input type="password" class="input input-bordered w-full text-base" 
                  placeholder="请输入 MiniMax API Key" v-model="config.apiKey">
         </div>
 
         <div class="form-control mb-6">
           <label class="label">
-            <span class="label-text">Group ID</span>
+            <span class="label-text text-base">Group ID</span>
           </label>
-          <input type="text" class="input input-bordered w-full" 
+          <input type="text" class="input input-bordered w-full text-base" 
                  placeholder="请输入 Group ID" v-model="config.groupId">
         </div>
 
         <div class="modal-action">
-          <button class="btn btn-ghost" @click="showSettings = false">取消</button>
-          <button class="btn btn-primary" @click="saveConfig">保存</button>
+          <button class="btn btn-ghost text-base" @click="showSettings = false">取消</button>
+          <button class="btn btn-primary text-base" @click="saveConfig">保存</button>
         </div>
       </div>
     </div>
@@ -567,13 +604,13 @@ const isOverLimit = computed(() => charCount.value > maxChars)
     <!-- 音色选择模态框 -->
     <div class="modal" :class="{ 'modal-open': showVoiceModal }">
       <div class="modal-box max-w-4xl">
-        <h3 class="font-bold text-lg mb-4">选择音色</h3>
+        <h3 class="font-bold text-xl mb-4">选择音色</h3>
         
         <!-- 搜索框 -->
         <div class="form-control mb-4">
           <input 
             type="text" 
-            class="input input-bordered w-full" 
+            class="input input-bordered w-full text-base" 
             placeholder="搜索音色名称、ID或关键词..."
             v-model="voiceSearchQuery"
           >
@@ -615,7 +652,7 @@ const isOverLimit = computed(() => charCount.value > maxChars)
         </div>
 
         <div class="modal-action">
-          <button class="btn btn-ghost" @click="showVoiceModal = false">关闭</button>
+          <button class="btn btn-ghost text-base" @click="showVoiceModal = false">关闭</button>
         </div>
       </div>
     </div>

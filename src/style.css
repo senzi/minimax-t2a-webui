@@ -1,4 +1,78 @@
 @import "tailwindcss";
+@import url("https://chinese-fonts-cdn.deno.dev/packages/lxgwwenkai/dist/LXGWWenKai-Regular/result.css");
 @plugin "daisyui" {
-  themes: autumn --default, dark --prefersdark;
+  themes: caramellatte --default, dark --prefersdark;
+}
+
+/* 全局字体设置 */
+* {
+  font-family: 'LXGW WenKai', sans-serif;
+  font-weight: 400;
+}
+
+/* 自定义样式优化 */
+.range {
+  margin-bottom: 0.5rem;
+}
+
+/* 增加整体字体大小 */
+body {
+  font-size: 16px;
+}
+
+/* 优化滑动条容器间距 */
+.form-control .px-3 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* 音频控件样式优化 */
+audio {
+  max-width: 100%;
+  height: 48px;
+}
+
+/* 进度条样式优化 */
+.progress {
+  height: 12px;
+}
+
+/* 顶栏样式优化 - 与内容区域对齐 */
+.navbar {
+  max-width: 1280px; /* 与 container 的 max-width 保持一致 */
+  margin: 0 auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* 确保顶栏背景延伸到全宽 */
+.navbar-wrapper {
+  background-color: hsl(var(--b2));
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+/* 情感标签布局优化 - 每行最多4个 */
+.emotion-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .emotion-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 文本框自动扩高样式 */
+.auto-resize-textarea {
+  resize: none;
+  overflow-y: hidden;
+  min-height: 20rem; /* 320px */
+  max-height: 100rem; /* 1280px */
+  transition: height 0.2s ease;
+}
+
+.auto-resize-textarea.scrollable {
+  overflow-y: auto;
 }
