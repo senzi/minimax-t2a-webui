@@ -637,9 +637,9 @@ function estimateUsageCharacters(text) {
 
     <!-- 主要内容区域 -->
     <div class="container mx-auto p-4">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <!-- 左侧配置面板 -->
-        <div class="lg:col-span-1">
+        <div class="lg:col-span-2">
           <div class="card bg-base-200 shadow-sm">
             <div class="card-body">
               <h2 class="card-title text-lg mb-4">语音配置</h2>
@@ -744,49 +744,43 @@ function estimateUsageCharacters(text) {
               </div>
 
               <!-- 语速 -->
-              <div class="form-control mb-4">
-                <label class="label py-2">
-                  <span class="label-text text-base">语速: {{ t2aConfig.speed }}</span>
-                </label>
-                <div class="px-3">
-                  <input type="range" min="0.5" max="2.0" step="0.1" 
-                         class="range range-primary my-1" v-model.number="t2aConfig.speed">
-                  <div class="w-full flex justify-between text-sm px-2 mt-1">
-                    <span>0.5x</span>
-                    <span>1.0x</span>
-                    <span>2.0x</span>
+              <div class="form-control mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0 w-20">
+                    <span class="text-sm font-medium">语速</span>
+                    <div class="text-xs text-base-content/70">{{ t2aConfig.speed }}</div>
+                  </div>
+                  <div class="flex-1">
+                    <input type="range" min="0.5" max="2.0" step="0.1" 
+                           class="range range-primary range-sm" v-model.number="t2aConfig.speed">
                   </div>
                 </div>
               </div>
 
               <!-- 音量 -->
-              <div class="form-control mb-4">
-                <label class="label py-2">
-                  <span class="label-text text-base">音量: {{ t2aConfig.vol }}</span>
-                </label>
-                <div class="px-3">
-                  <input type="range" min="0.1" max="10" step="0.1" 
-                         class="range range-primary my-1" v-model.number="t2aConfig.vol">
-                  <div class="w-full flex justify-between text-sm px-2 mt-1">
-                    <span>0.1</span>
-                    <span>5.0</span>
-                    <span>10</span>
+              <div class="form-control mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0 w-20">
+                    <span class="text-sm font-medium">音量</span>
+                    <div class="text-xs text-base-content/70">{{ t2aConfig.vol }}</div>
+                  </div>
+                  <div class="flex-1">
+                    <input type="range" min="0.1" max="10" step="0.1" 
+                           class="range range-primary range-sm" v-model.number="t2aConfig.vol">
                   </div>
                 </div>
               </div>
 
               <!-- 音高 -->
-              <div class="form-control mb-4">
-                <label class="label py-2">
-                  <span class="label-text text-base">音高: {{ t2aConfig.pitch }}</span>
-                </label>
-                <div class="px-3">
-                  <input type="range" min="-12" max="12" step="1" 
-                         class="range range-primary my-1" v-model.number="t2aConfig.pitch">
-                  <div class="w-full flex justify-between text-sm px-2 mt-1">
-                    <span>-12</span>
-                    <span>0</span>
-                    <span>+12</span>
+              <div class="form-control mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0 w-20">
+                    <span class="text-sm font-medium">音高</span>
+                    <div class="text-xs text-base-content/70">{{ t2aConfig.pitch }}</div>
+                  </div>
+                  <div class="flex-1">
+                    <input type="range" min="-12" max="12" step="1" 
+                           class="range range-primary range-sm" v-model.number="t2aConfig.pitch">
                   </div>
                 </div>
               </div>
@@ -813,7 +807,7 @@ function estimateUsageCharacters(text) {
         </div>
 
         <!-- 右侧文本输入区域 -->
-        <div class="lg:col-span-2">
+        <div class="lg:col-span-3">
           <div class="card bg-base-200 shadow-sm">
             <div class="card-body">
               <div class="flex justify-between items-center mb-4">
@@ -1220,7 +1214,7 @@ function estimateUsageCharacters(text) {
 /* 情感按钮网格布局 */
 .emotion-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.5rem;
 }
 
