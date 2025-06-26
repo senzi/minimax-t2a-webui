@@ -575,28 +575,120 @@ const isOverLimit = computed(() => charCount.value > maxChars)
 
     <!-- 设置模态框 -->
     <div class="modal" :class="{ 'modal-open': showSettings }">
-      <div class="modal-box">
+      <div class="modal-box max-w-2xl">
         <h3 class="font-bold text-xl mb-4">API 配置</h3>
         
-        <div class="form-control mb-4">
-          <label class="label">
-            <span class="label-text text-base">API Key</span>
-          </label>
-          <input type="password" class="input input-bordered w-full text-base" 
-                 placeholder="请输入 MiniMax API Key" v-model="config.apiKey">
+        <!-- 引导说明 -->
+        <div class="alert alert-info mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <div>
+            <h4 class="font-bold">配置说明</h4>
+            <div class="text-sm mt-1">请按照以下步骤获取所需的配置信息</div>
+          </div>
         </div>
 
-        <div class="form-control mb-6">
+        <!-- Group ID 配置 -->
+        <div class="form-control mb-4">
           <label class="label">
-            <span class="label-text text-base">Group ID</span>
+            <span class="label-text text-base font-semibold">Group ID</span>
           </label>
           <input type="text" class="input input-bordered w-full text-base" 
                  placeholder="请输入 Group ID" v-model="config.groupId">
+          <div class="label">
+            <span class="label-text-alt text-sm">
+              <div class="flex items-center gap-2 mt-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>获取方式：登录 MiniMax 平台，在</span>
+                <a href="https://platform.minimaxi.com/user-center/basic-information" 
+                   target="_blank" 
+                   class="link link-primary font-medium">
+                  基本信息页面
+                </a>
+                <span>查看</span>
+              </div>
+            </span>
+          </div>
+        </div>
+
+        <!-- API Key 配置 -->
+        <div class="form-control mb-6">
+          <label class="label">
+            <span class="label-text text-base font-semibold">API Key</span>
+          </label>
+          <input type="password" class="input input-bordered w-full text-base" 
+                 placeholder="请输入 MiniMax API Key" v-model="config.apiKey">
+          <div class="label">
+            <span class="label-text-alt text-sm">
+              <div class="flex items-start gap-2 mt-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-warning mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <div>
+                  <div class="mb-1">
+                    <span>获取方式：前往</span>
+                    <a href="https://platform.minimaxi.com/user-center/basic-information/interface-key" 
+                       target="_blank" 
+                       class="link link-primary font-medium">
+                      接口密钥页面
+                    </a>
+                    <span>申请</span>
+                  </div>
+                  <div class="text-warning font-medium">
+                    ⚠️ 重要：申请后请立即复制保存，页面不会重复显示！
+                  </div>
+                </div>
+              </div>
+            </span>
+          </div>
+        </div>
+
+        <!-- 配置步骤说明 -->
+        <div class="collapse collapse-arrow bg-base-200 mb-4">
+          <input type="checkbox" /> 
+          <div class="collapse-title text-base font-medium">
+            📋 详细配置步骤
+          </div>
+          <div class="collapse-content"> 
+            <div class="space-y-3 text-sm">
+              <div class="steps steps-vertical">
+                <div class="step step-primary">
+                  <div class="text-left">
+                    <div class="font-semibold">获取 Group ID</div>
+                    <div class="text-xs opacity-70 mt-1">
+                      访问 <a href="https://platform.minimaxi.com/user-center/basic-information" target="_blank" class="link">基本信息页面</a>，
+                      在页面中找到您的 Group ID
+                    </div>
+                  </div>
+                </div>
+                <div class="step step-primary">
+                  <div class="text-left">
+                    <div class="font-semibold">申请 API Key</div>
+                    <div class="text-xs opacity-70 mt-1">
+                      访问 <a href="https://platform.minimaxi.com/user-center/basic-information/interface-key" target="_blank" class="link">接口密钥页面</a>，
+                      点击申请新的 API Key
+                    </div>
+                  </div>
+                </div>
+                <div class="step step-primary">
+                  <div class="text-left">
+                    <div class="font-semibold">保存配置</div>
+                    <div class="text-xs opacity-70 mt-1">
+                      将获取到的 Group ID 和 API Key 填入上方表单，点击保存
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="modal-action">
           <button class="btn btn-ghost text-base" @click="showSettings = false">取消</button>
-          <button class="btn btn-primary text-base" @click="saveConfig">保存</button>
+          <button class="btn btn-primary text-base" @click="saveConfig">保存配置</button>
         </div>
       </div>
     </div>
