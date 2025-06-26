@@ -1,12 +1,15 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
+import systemVoices from './assets/voices/system_voice.json'
 
 // 响应式数据
 const showSettings = ref(false)
+const showVoiceModal = ref(false)
 const isLoading = ref(false)
 const audioUrl = ref('')
 const audioBlob = ref(null)
 const progress = ref(0)
+const voiceSearchQuery = ref('')
 
 // 配置数据
 const config = reactive({
@@ -16,6 +19,7 @@ const config = reactive({
 
 // T2A 参数配置
 const t2aConfig = reactive({
+  model: 'speech-02-hd',
   voiceId: 'male-qn-qingse',
   speed: 1.0,
   vol: 1.0,
@@ -27,12 +31,12 @@ const t2aConfig = reactive({
 const inputText = ref('')
 const maxChars = 5000
 
-// 音色选项
-const voiceOptions = [
-  { id: 'male-qn-qingse', name: '青年男声' },
-  { id: 'female-shaonv', name: '少女' },
-  { id: 'male-qingshu', name: '青叔' },
-  { id: 'female-tianmei', name: '甜美女声' }
+// 模型选项
+const modelOptions = [
+  { id: 'speech-02-hd', name: 'Speech-02-HD', description: '持续更新的HD模型，拥有更出色的韵律、稳定性和复刻相似度，音质表现突出' },
+  { id: 'speech-02-turbo', name: 'Speech-02-Turbo', description: '持续更新的Turbo模型，拥有更出色的韵律和稳定性，小语种能力加强，性能表现出色' },
+  { id: 'speech-01-hd', name: 'Speech-01-HD', description: '稳定版本的HD模型，拥有超高的复刻相似度，音质表现突出' },
+  { id: 'speech-01-turbo', name: 'Speech-01-Turbo', description: '稳定版本的Turbo模型，在出色的生成效果基础上有更快的生成速度' }
 ]
 
 // 情感选项
@@ -46,9 +50,46 @@ const emotionOptions = [
   { value: 'surprised', label: '惊讶' }
 ]
 
+// 计算属性：当前选中的音色信息
+const currentVoice = computed(() => {
+  return systemVoices.find(voice => voice.voice_id === t2aConfig.voiceId) || {
+    voice_id: 'male-qn-qingse',
+    voice_name: '青涩青年音色',
+    keywords: ['male', 'qingse', 'qn', '青涩青年音色']
+  }
+})
+
+// 计算属性：过滤后的音色列表
+const filteredVoices = computed(() => {
+  if (!voiceSearchQuery.value.trim()) {
+    return systemVoices
+  }
+  
+  const query = voiceSearchQuery.value.toLowerCase().trim()
+  return systemVoices.filter(voice => {
+    // 搜索 voice_name
+    if (voice.voice_name.toLowerCase().includes(query)) {
+      return true
+    }
+    
+    // 搜索 voice_id
+    if (voice.voice_id.toLowerCase().includes(query)) {
+      return true
+    }
+    
+    // 搜索 keywords
+    if (voice.keywords.some(keyword => keyword.toLowerCase().includes(query))) {
+      return true
+    }
+    
+    return false
+  })
+})
+
 // 页面初始化
 onMounted(() => {
   loadConfig()
+  loadVoiceConfig()
 })
 
 // 加载配置
@@ -59,6 +100,36 @@ function loadConfig() {
     config.apiKey = parsed.apiKey || ''
     config.groupId = parsed.groupId || ''
   }
+}
+
+// 加载音色配置
+function loadVoiceConfig() {
+  const savedVoice = localStorage.getItem('minimax-voice')
+  if (savedVoice) {
+    const voiceExists = systemVoices.find(voice => voice.voice_id === savedVoice)
+    if (voiceExists) {
+      t2aConfig.voiceId = savedVoice
+    }
+  }
+}
+
+// 保存音色配置
+function saveVoiceConfig() {
+  localStorage.setItem('minimax-voice', t2aConfig.voiceId)
+}
+
+// 选择音色
+function selectVoice(voiceId) {
+  t2aConfig.voiceId = voiceId
+  saveVoiceConfig()
+  showVoiceModal.value = false
+  voiceSearchQuery.value = ''
+}
+
+// 打开音色选择模态框
+function openVoiceModal() {
+  showVoiceModal.value = true
+  voiceSearchQuery.value = ''
 }
 
 // 保存配置
@@ -108,7 +179,7 @@ async function startSynthesis() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'speech-02-turbo',
+        model: t2aConfig.model,
         text: inputText.value,
         stream: true,
         output_format: 'hex',
@@ -125,7 +196,7 @@ async function startSynthesis() {
           sample_rate: 32000,
           bitrate: 128000,
           format: 'mp3',
-          channel: 1
+          channel: 2
         },
         emotion: t2aConfig.emotion
       })
@@ -300,16 +371,44 @@ const isOverLimit = computed(() => charCount.value > maxChars)
             <div class="card-body">
               <h2 class="card-title text-lg mb-4">语音配置</h2>
               
+              <!-- 模型选择 -->
+              <div class="form-control mb-4">
+                <label class="label">
+                  <span class="label-text">模型</span>
+                </label>
+                <div class="flex flex-wrap gap-2 mb-2">
+                  <button 
+                    v-for="model in modelOptions" 
+                    :key="model.id"
+                    class="btn btn-sm"
+                    :class="t2aConfig.model === model.id ? 'btn-primary' : 'btn-outline'"
+                    @click="t2aConfig.model = model.id"
+                  >
+                    {{ model.name }}
+                  </button>
+                </div>
+                <div class="text-xs text-base-content/70 leading-relaxed">
+                  {{ modelOptions.find(m => m.id === t2aConfig.model)?.description }}
+                </div>
+              </div>
+              
               <!-- 音色选择 -->
               <div class="form-control mb-4">
                 <label class="label">
                   <span class="label-text">音色</span>
                 </label>
-                <select class="select select-bordered w-full" v-model="t2aConfig.voiceId">
-                  <option v-for="voice in voiceOptions" :key="voice.id" :value="voice.id">
-                    {{ voice.name }}
-                  </option>
-                </select>
+                <button 
+                  class="btn btn-outline w-full justify-start text-left"
+                  @click="openVoiceModal"
+                >
+                  <div class="flex flex-col items-start">
+                    <div class="font-medium">{{ currentVoice.voice_name }}</div>
+                    <div class="text-xs opacity-70">{{ currentVoice.voice_id }}</div>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
               </div>
 
               <!-- 语速 -->
@@ -359,11 +458,17 @@ const isOverLimit = computed(() => charCount.value > maxChars)
                 <label class="label">
                   <span class="label-text">情感</span>
                 </label>
-                <select class="select select-bordered w-full" v-model="t2aConfig.emotion">
-                  <option v-for="emotion in emotionOptions" :key="emotion.value" :value="emotion.value">
+                <div class="flex flex-wrap gap-2">
+                  <button 
+                    v-for="emotion in emotionOptions" 
+                    :key="emotion.value"
+                    class="btn btn-sm"
+                    :class="t2aConfig.emotion === emotion.value ? 'btn-primary' : 'btn-outline'"
+                    @click="t2aConfig.emotion = emotion.value"
+                  >
                     {{ emotion.label }}
-                  </option>
-                </select>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -455,6 +560,62 @@ const isOverLimit = computed(() => charCount.value > maxChars)
         <div class="modal-action">
           <button class="btn btn-ghost" @click="showSettings = false">取消</button>
           <button class="btn btn-primary" @click="saveConfig">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 音色选择模态框 -->
+    <div class="modal" :class="{ 'modal-open': showVoiceModal }">
+      <div class="modal-box max-w-4xl">
+        <h3 class="font-bold text-lg mb-4">选择音色</h3>
+        
+        <!-- 搜索框 -->
+        <div class="form-control mb-4">
+          <input 
+            type="text" 
+            class="input input-bordered w-full" 
+            placeholder="搜索音色名称、ID或关键词..."
+            v-model="voiceSearchQuery"
+          >
+        </div>
+
+        <!-- 音色网格 -->
+        <div class="max-h-96 overflow-y-auto">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <button
+              v-for="voice in filteredVoices"
+              :key="voice.voice_id"
+              class="btn btn-outline text-left h-auto p-3"
+              :class="{ 'btn-primary': voice.voice_id === t2aConfig.voiceId }"
+              @click="selectVoice(voice.voice_id)"
+            >
+              <div class="flex flex-col items-start w-full">
+                <div class="font-medium text-sm">{{ voice.voice_name }}</div>
+                <div class="text-xs opacity-70 mt-1">{{ voice.voice_id }}</div>
+                <div class="text-xs opacity-50 mt-1 flex flex-wrap gap-1">
+                  <span 
+                    v-for="keyword in voice.keywords.slice(0, 3)" 
+                    :key="keyword"
+                    class="badge badge-xs"
+                  >
+                    {{ keyword }}
+                  </span>
+                  <span v-if="voice.keywords.length > 3" class="text-xs">...</span>
+                </div>
+              </div>
+            </button>
+          </div>
+          
+          <!-- 无搜索结果提示 -->
+          <div v-if="filteredVoices.length === 0" class="text-center py-8 text-base-content/50">
+            <div class="text-lg mb-2">😔</div>
+            <div>未找到匹配的音色</div>
+            <div class="text-sm mt-1">请尝试其他关键词</div>
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showVoiceModal = false">关闭</button>
         </div>
       </div>
     </div>
