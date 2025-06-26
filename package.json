@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prebuild": "npm install --no-optional",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",
-    "vite": "6.3.5"
+    "vite": "6.3.5",
+    "rollup": "^3.29.4"
   }
 }
