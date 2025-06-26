@@ -30,12 +30,19 @@ const config = reactive({
 // T2A 参数配置
 const t2aConfig = reactive({
   model: 'speech-02-hd',
-  voiceId: 'male-qn-qingse',
   speed: 1.0,
   vol: 1.0,
   pitch: 0,
   emotion: 'neutral'
 })
+
+// 音色混合配置（统一配置，单音色也使用此结构）
+const timberWeights = reactive([
+  { voiceId: 'male-qn-qingse', weight: 100 }
+])
+
+// 音色选择相关状态
+const editingVoiceIndex = ref(-1) // 当前编辑的音色索引
 
 // 文本输入
 const inputText = ref('')
@@ -62,13 +69,15 @@ const emotionOptions = [
   { value: 'surprised', label: '惊讶' }
 ]
 
-// 计算属性：当前选中的音色信息
-const currentVoice = computed(() => {
-  return systemVoices.find(voice => voice.voice_id === t2aConfig.voiceId) || {
-    voice_id: 'male-qn-qingse',
-    voice_name: '青涩青年音色',
-    keywords: ['male', 'qingse', 'qn', '青涩青年音色']
-  }
+
+// 计算属性：是否为多音色模式
+const isMultiVoiceMode = computed(() => {
+  return timberWeights.length > 1
+})
+
+// 计算属性：权重总和
+const totalWeight = computed(() => {
+  return timberWeights.reduce((sum, item) => sum + (item.weight || 0), 0)
 })
 
 // 计算属性：过滤后的音色列表
@@ -111,7 +120,7 @@ const progressLabel = computed(() => {
 // 页面初始化
 onMounted(() => {
   loadConfig()
-  loadVoiceConfig()
+  loadTimberWeightsConfig()
 })
 
 // 加载配置
@@ -124,34 +133,121 @@ function loadConfig() {
   }
 }
 
-// 加载音色配置
-function loadVoiceConfig() {
-  const savedVoice = localStorage.getItem('minimax-voice')
-  if (savedVoice) {
-    const voiceExists = systemVoices.find(voice => voice.voice_id === savedVoice)
-    if (voiceExists) {
-      t2aConfig.voiceId = savedVoice
+
+// 选择音色
+function selectVoice(voiceId) {
+  // 统一使用 timberWeights 配置
+  if (editingVoiceIndex.value >= 0) {
+    timberWeights[editingVoiceIndex.value].voiceId = voiceId
+  } else {
+    // 如果没有指定索引，默认修改第一个音色
+    timberWeights[0].voiceId = voiceId
+  }
+  saveTimberWeightsConfig()
+  showVoiceModal.value = false
+  voiceSearchQuery.value = ''
+  editingVoiceIndex.value = -1
+}
+
+// 打开音色选择模态框
+function openVoiceModal(index = -1) {
+  editingVoiceIndex.value = index
+  showVoiceModal.value = true
+  voiceSearchQuery.value = ''
+}
+
+// 添加音色到多音色配置
+function addTimberWeight() {
+  if (timberWeights.length >= 4) {
+    showInlineAlert('最多只能添加 4 个音色', 'warning')
+    return
+  }
+  
+  timberWeights.push({
+    voiceId: 'male-qn-qingse',
+    weight: 50
+  })
+  saveTimberWeightsConfig()
+}
+
+// 删除音色配置项
+function removeTimberWeight(index) {
+  if (timberWeights.length <= 1) {
+    showInlineAlert('至少需要保留一个音色', 'warning')
+    return
+  }
+  
+  timberWeights.splice(index, 1)
+  saveTimberWeightsConfig()
+}
+
+// 获取音色信息
+function getVoiceInfo(voiceId) {
+  return systemVoices.find(voice => voice.voice_id === voiceId) || {
+    voice_id: voiceId,
+    voice_name: '未知音色',
+    keywords: []
+  }
+}
+
+// 保存多音色配置
+function saveTimberWeightsConfig() {
+  localStorage.setItem('minimax-timber-weights', JSON.stringify(timberWeights))
+}
+
+// 加载多音色配置
+function loadTimberWeightsConfig() {
+  const saved = localStorage.getItem('minimax-timber-weights')
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        timberWeights.splice(0, timberWeights.length, ...parsed)
+      }
+    } catch (e) {
+      console.warn('加载多音色配置失败:', e)
     }
   }
 }
 
-// 保存音色配置
-function saveVoiceConfig() {
-  localStorage.setItem('minimax-voice', t2aConfig.voiceId)
+// 校验多音色配置
+function validateTimberWeights() {
+  // 检查是否有空的音色ID或无效权重
+  for (const item of timberWeights) {
+    if (!item.voiceId || item.weight <= 0) {
+      return false
+    }
+  }
+  return true
 }
 
-// 选择音色
-function selectVoice(voiceId) {
-  t2aConfig.voiceId = voiceId
-  saveVoiceConfig()
-  showVoiceModal.value = false
-  voiceSearchQuery.value = ''
-}
+// 构造请求体中的音色配置
+function buildVoiceConfig() {
+  if (!validateTimberWeights()) {
+    throw new Error('请完整填写音色和权重')
+  }
 
-// 打开音色选择模态框
-function openVoiceModal() {
-  showVoiceModal.value = true
-  voiceSearchQuery.value = ''
+  // 归一化权重
+  const total = timberWeights.reduce((sum, item) => sum + item.weight, 0)
+  const normalized = timberWeights.map(item => ({
+    voice_id: item.voiceId,
+    weight: Math.round((item.weight / total) * 100)
+  }))
+
+  // 确保总和不超过100
+  const sum = normalized.reduce((s, item) => s + item.weight, 0)
+  if (sum > 100) {
+    const maxIndex = normalized.findIndex(item => 
+      item.weight === Math.max(...normalized.map(n => n.weight))
+    )
+    normalized[maxIndex].weight -= (sum - 100)
+  }
+
+  // 返回主音色ID和权重配置
+  return {
+    primaryVoiceId: timberWeights[0].voiceId,
+    timber_weights: normalized
+  }
 }
 
 // 保存配置
@@ -196,34 +292,41 @@ async function startSynthesis() {
   console.log(`预测字符数: ${usageChars.value}，预计数据块: ${expectedChunks.value}`)
 
   try {
+    // 构造音色配置
+    const voiceConfig = buildVoiceConfig()
+    
+    // 构造请求体
+    const requestBody = {
+      model: t2aConfig.model,
+      text: inputText.value,
+      stream: true,
+      output_format: 'hex',
+      stream_options: {
+        exclude_aggregated_audio: true
+      },
+      voice_setting: {
+        voice_id: voiceConfig.primaryVoiceId, // 必填字段
+        speed: t2aConfig.speed,
+        vol: t2aConfig.vol,
+        pitch: t2aConfig.pitch
+      },
+      audio_setting: {
+        sample_rate: 32000,
+        bitrate: 128000,
+        format: 'mp3',
+        channel: 2
+      },
+      emotion: t2aConfig.emotion,
+      timber_weights: voiceConfig.timber_weights
+    }
+
     const response = await fetch(`https://api.minimaxi.com/v1/t2a_v2?GroupId=${config.groupId}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        model: t2aConfig.model,
-        text: inputText.value,
-        stream: true,
-        output_format: 'hex',
-        stream_options: {
-          exclude_aggregated_audio: true
-        },
-        voice_setting: {
-          voice_id: t2aConfig.voiceId,
-          speed: t2aConfig.speed,
-          vol: t2aConfig.vol,
-          pitch: t2aConfig.pitch
-        },
-        audio_setting: {
-          sample_rate: 32000,
-          bitrate: 128000,
-          format: 'mp3',
-          channel: 2
-        },
-        emotion: t2aConfig.emotion
-      })
+      body: JSON.stringify(requestBody)
     })
 
     if (!response.ok) {
@@ -256,18 +359,24 @@ async function startSynthesis() {
               if (data.data && data.data.audio) {
                 const hexString = data.data.audio
                 
+                // 🔍 添加 hex 转换日志
+                console.log('Hex string length:', hexString.length)
+                console.log('First 20 chars of hex:', hexString.slice(0, 20))
+                
                 // 将 hex 字符串转换为 Uint8Array
                 const audioData = new Uint8Array(hexString.length / 2)
                 for (let i = 0; i < hexString.length; i += 2) {
                   audioData[i / 2] = parseInt(hexString.substr(i, 2), 16)
                 }
+                
+                console.log('Converted audio chunk size:', audioData.length)
                 audioChunks.push(audioData)
                 
                 // 更新接收块数和进度
                 receivedChunks.value++
                 progress.value = Math.floor((receivedChunks.value / expectedChunks.value) * 100)
                 
-                console.log(`添加音频块: ${audioChunks.length}, 大小: ${audioData.length}`)
+                console.log(`🧱 添加音频块: ${audioChunks.length}, 大小: ${audioData.length}`)
               }
 
               // 检查是否完成，提取使用字符数
@@ -331,8 +440,13 @@ async function startSynthesis() {
 
     console.log(`共接收到 ${receivedChunks.value} 块数据，预计总块数为 ${expectedChunks.value}`)
 
-    // 合并所有音频块
+    // --- 🔍 LOGGING BLOCK START ---
+    console.log('🧱 当前音频块数:', audioChunks.length)
+    console.log('📦 拼接前每块大小:', audioChunks.map(c => c.length))
     const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0)
+    console.log('🧩 拼接后总长度:', totalLength)
+
+    // 合并所有音频块
     const mergedAudio = new Uint8Array(totalLength)
     let offset = 0
     for (const chunk of audioChunks) {
@@ -340,9 +454,14 @@ async function startSynthesis() {
       offset += chunk.length
     }
 
-    // 创建 Blob 和 URL
     audioBlob.value = new Blob([mergedAudio], { type: 'audio/mp3' })
+    console.log('🎧 Blob size:', audioBlob.value.size)
+    console.log('🎧 Blob type:', audioBlob.value.type)
+
     audioUrl.value = URL.createObjectURL(audioBlob.value)
+    console.log('🔗 Audio URL:', audioUrl.value)
+    // --- 🔍 LOGGING BLOCK END ---
+    
     progress.value = 100
 
   } catch (error) {
@@ -482,23 +601,73 @@ function estimateUsageCharacters(text) {
                 </div>
               </div>
               
-              <!-- 音色选择 -->
+              <!-- 音色及混合配置 -->
               <div class="form-control mb-4">
                 <label class="label">
-                  <span class="label-text text-base">音色</span>
+                  <span class="label-text text-base">音色及混合 <span class="text-xs text-base-content/60">(最多 4 个)</span></span>
                 </label>
-                <button 
-                  class="btn btn-outline w-full justify-start text-left h-16 py-2"
-                  @click="openVoiceModal"
-                >
-                  <div class="flex flex-col items-start w-full">
-                    <div class="font-medium text-sm">{{ currentVoice.voice_name }}</div>
-                    <div class="text-xs opacity-70">{{ currentVoice.voice_id }}</div>
+                
+                <!-- 音色配置列表 -->
+                <div class="space-y-2 mb-3">
+                  <div 
+                    v-for="(item, index) in timberWeights" 
+                    :key="index"
+                    class="flex items-center gap-2 p-2 bg-base-100 rounded-lg border border-base-300"
+                  >
+                    <!-- 音色选择按钮 -->
+                    <button 
+                      class="btn btn-outline btn-sm flex-1 justify-start text-left h-12 py-1"
+                      @click="openVoiceModal(index)"
+                    >
+                      <div class="flex flex-col items-start w-full">
+                        <div class="font-medium text-xs">{{ getVoiceInfo(item.voiceId).voice_name }}</div>
+                        <div class="text-xs opacity-70">{{ item.voiceId }}</div>
+                      </div>
+                    </button>
+                    
+                    <!-- 权重输入 -->
+                    <div class="flex items-center gap-1">
+                      <input 
+                        type="number" 
+                        class="input input-bordered input-sm w-16 text-center text-xs"
+                        min="1"
+                        step="1"
+                        v-model.number="item.weight"
+                        @input="saveTimberWeightsConfig"
+                      >
+                      <span class="text-xs opacity-70">%</span>
+                    </div>
+                    
+                    <!-- 删除按钮 -->
+                    <button 
+                      v-if="timberWeights.length > 1"
+                      class="btn btn-ghost btn-sm btn-circle text-error hover:bg-error hover:text-error-content"
+                      @click="removeTimberWeight(index)"
+                      title="删除此音色"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </div>
+                
+                <!-- 添加音色按钮 -->
+                <button 
+                  v-if="timberWeights.length < 4"
+                  class="btn btn-outline btn-sm w-full"
+                  @click="addTimberWeight"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
+                  添加音色
                 </button>
+                
+                <!-- 权重总和提示 -->
+                <div v-if="isMultiVoiceMode" class="text-xs text-base-content/60 mt-2">
+                  权重总和: {{ totalWeight }}% (提交时会自动归一化)
+                </div>
               </div>
 
               <!-- 语速 -->
@@ -821,7 +990,7 @@ function estimateUsageCharacters(text) {
               v-for="voice in filteredVoices"
               :key="voice.voice_id"
               class="btn btn-outline text-left h-auto p-3"
-              :class="{ 'btn-primary': voice.voice_id === t2aConfig.voiceId }"
+              :class="{ 'btn-primary': voice.voice_id === (editingVoiceIndex >= 0 ? timberWeights[editingVoiceIndex]?.voiceId : timberWeights[0]?.voiceId) }"
               @click="selectVoice(voice.voice_id)"
             >
               <div class="flex flex-col items-start w-full">
@@ -860,5 +1029,79 @@ function estimateUsageCharacters(text) {
 <style scoped>
 .range {
   margin-bottom: 0.5rem;
+}
+
+/* 情感按钮网格布局 */
+.emotion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 0.5rem;
+}
+
+/* 自动调整高度的文本框 */
+.auto-resize-textarea {
+  min-height: 120px;
+  resize: none;
+  transition: height 0.2s ease;
+}
+
+.auto-resize-textarea.scrollable {
+  overflow-y: auto;
+}
+
+/* 导航栏样式 */
+.navbar-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: hsl(var(--b1));
+  border-bottom: 1px solid hsl(var(--b3));
+}
+
+/* 多音色配置项的悬停效果 */
+.timber-weight-item {
+  transition: all 0.2s ease;
+}
+
+.timber-weight-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 权重输入框样式优化 */
+.weight-input {
+  transition: border-color 0.2s ease;
+}
+
+.weight-input:focus {
+  border-color: hsl(var(--p));
+  box-shadow: 0 0 0 2px hsl(var(--p) / 0.2);
+}
+
+/* 删除按钮的悬停动画 */
+.delete-btn {
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.delete-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* 添加音色按钮样式 */
+.add-voice-btn {
+  transition: all 0.2s ease;
+  border-style: dashed;
+}
+
+.add-voice-btn:hover {
+  border-style: solid;
+  transform: translateY(-1px);
+}
+
+/* 权重总和提示样式 */
+.weight-summary {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
 }
 </style>
