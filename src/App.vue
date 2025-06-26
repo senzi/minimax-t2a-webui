@@ -43,6 +43,9 @@ const timberWeights = reactive([
 
 // 音色选择相关状态
 const editingVoiceIndex = ref(-1) // 当前编辑的音色索引
+const customVoiceMode = ref(false) // 是否为自定义音色模式
+const customVoiceId = ref('') // 自定义音色ID输入
+const customVoiceValidation = ref({ isValid: true, message: '' }) // 自定义音色验证结果
 
 // 文本输入
 const inputText = ref('')
@@ -134,6 +137,60 @@ function loadConfig() {
 }
 
 
+// 验证自定义音色ID
+function validateCustomVoiceId(voiceId) {
+  if (!voiceId || voiceId.trim() === '') {
+    return { isValid: false, message: '音色ID不能为空' }
+  }
+  
+  const trimmedId = voiceId.trim()
+  
+  // 长度检查
+  if (trimmedId.length < 1 || trimmedId.length > 50) {
+    return { isValid: false, message: '音色ID长度应在1-50个字符之间' }
+  }
+  
+  // 扩展的音色ID验证：支持字母、数字、下划线、连字符、空格和括号（全角半角）
+  // 不能以数字开头
+  const validPattern = /^[a-zA-Z_][a-zA-Z0-9_\-\s()（）]*$/
+  if (!validPattern.test(trimmedId)) {
+    return { isValid: false, message: '音色ID只能包含字母、数字、下划线、连字符、空格和括号，且不能以数字开头' }
+  }
+  
+  return { isValid: true, message: '音色ID格式正确' }
+}
+
+// 实时验证自定义音色ID
+function onCustomVoiceIdInput() {
+  customVoiceValidation.value = validateCustomVoiceId(customVoiceId.value)
+}
+
+// 确认自定义音色ID
+function confirmCustomVoice() {
+  const validation = validateCustomVoiceId(customVoiceId.value)
+  if (!validation.isValid) {
+    customVoiceValidation.value = validation
+    return
+  }
+  
+  const trimmedId = customVoiceId.value.trim()
+  selectVoice(trimmedId)
+  
+  // 重置自定义音色输入状态
+  customVoiceMode.value = false
+  customVoiceId.value = ''
+  customVoiceValidation.value = { isValid: true, message: '' }
+}
+
+// 切换自定义音色模式
+function toggleCustomVoiceMode() {
+  customVoiceMode.value = !customVoiceMode.value
+  if (customVoiceMode.value) {
+    customVoiceId.value = ''
+    customVoiceValidation.value = { isValid: true, message: '' }
+  }
+}
+
 // 选择音色
 function selectVoice(voiceId) {
   // 统一使用 timberWeights 配置
@@ -183,10 +240,17 @@ function removeTimberWeight(index) {
 
 // 获取音色信息
 function getVoiceInfo(voiceId) {
-  return systemVoices.find(voice => voice.voice_id === voiceId) || {
+  const systemVoice = systemVoices.find(voice => voice.voice_id === voiceId)
+  if (systemVoice) {
+    return systemVoice
+  }
+  
+  // 自定义音色处理
+  return {
     voice_id: voiceId,
-    voice_name: '未知音色',
-    keywords: []
+    voice_name: '自定义音色',
+    keywords: ['custom'],
+    isCustom: true
   }
 }
 
@@ -620,7 +684,16 @@ function estimateUsageCharacters(text) {
                       @click="openVoiceModal(index)"
                     >
                       <div class="flex flex-col items-start w-full">
-                        <div class="font-medium text-xs">{{ getVoiceInfo(item.voiceId).voice_name }}</div>
+                        <div class="flex items-center gap-1">
+                          <div class="font-medium text-xs">{{ getVoiceInfo(item.voiceId).voice_name }}</div>
+                          <span 
+                            v-if="getVoiceInfo(item.voiceId).isCustom" 
+                            class="badge badge-xs badge-secondary"
+                            title="自定义音色"
+                          >
+                            自定义
+                          </span>
+                        </div>
                         <div class="text-xs opacity-70">{{ item.voiceId }}</div>
                       </div>
                     </button>
@@ -973,48 +1046,161 @@ function estimateUsageCharacters(text) {
       <div class="modal-box max-w-4xl">
         <h3 class="font-bold text-xl mb-4">选择音色</h3>
         
-        <!-- 搜索框 -->
-        <div class="form-control mb-4">
-          <input 
-            type="text" 
-            class="input input-bordered w-full text-base" 
-            placeholder="搜索音色名称、ID或关键词..."
-            v-model="voiceSearchQuery"
+        <!-- 模式切换按钮 -->
+        <div class="tabs tabs-boxed mb-4">
+          <button 
+            class="tab text-sm"
+            :class="{ 'tab-active': !customVoiceMode }"
+            @click="toggleCustomVoiceMode"
           >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            选择预设音色
+          </button>
+          <button 
+            class="tab text-sm"
+            :class="{ 'tab-active': customVoiceMode }"
+            @click="toggleCustomVoiceMode"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            输入自定义音色ID
+          </button>
         </div>
 
-        <!-- 音色网格 -->
-        <div class="max-h-96 overflow-y-auto">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <button
-              v-for="voice in filteredVoices"
-              :key="voice.voice_id"
-              class="btn btn-outline text-left h-auto p-3"
-              :class="{ 'btn-primary': voice.voice_id === (editingVoiceIndex >= 0 ? timberWeights[editingVoiceIndex]?.voiceId : timberWeights[0]?.voiceId) }"
-              @click="selectVoice(voice.voice_id)"
-            >
-              <div class="flex flex-col items-start w-full">
-                <div class="font-medium text-sm">{{ voice.voice_name }}</div>
-                <div class="text-xs opacity-70 mt-1">{{ voice.voice_id }}</div>
-                <div class="text-xs opacity-50 mt-1 flex flex-wrap gap-1">
-                  <span 
-                    v-for="keyword in voice.keywords.slice(0, 3)" 
-                    :key="keyword"
-                    class="badge badge-xs"
+        <!-- 自定义音色输入区域 -->
+        <div v-if="customVoiceMode" class="mb-6">
+          <div class="card bg-base-200 border border-base-300">
+            <div class="card-body p-4">
+              <h4 class="font-semibold text-base mb-3">自定义音色ID</h4>
+              
+              <!-- 输入框 -->
+              <div class="form-control mb-3">
+                <input 
+                  type="text" 
+                  class="input input-bordered w-full text-base"
+                  :class="{ 'input-error': !customVoiceValidation.isValid && customVoiceId.trim() !== '' }"
+                  placeholder="请输入自定义音色ID，如：my_custom_voice"
+                  v-model="customVoiceId"
+                  @input="onCustomVoiceIdInput"
+                  @keyup.enter="confirmCustomVoice"
+                >
+              </div>
+              
+              <!-- 验证提示 -->
+              <div class="mb-3">
+                <div 
+                  v-if="customVoiceId.trim() !== ''"
+                  class="text-sm"
+                  :class="{
+                    'text-success': customVoiceValidation.isValid,
+                    'text-error': !customVoiceValidation.isValid
+                  }"
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    class="h-4 w-4 inline mr-1" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
                   >
-                    {{ keyword }}
-                  </span>
-                  <span v-if="voice.keywords.length > 3" class="text-xs">...</span>
+                    <path 
+                      v-if="customVoiceValidation.isValid"
+                      stroke-linecap="round" 
+                      stroke-linejoin="round" 
+                      stroke-width="2" 
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
+                    />
+                    <path 
+                      v-else
+                      stroke-linecap="round" 
+                      stroke-linejoin="round" 
+                      stroke-width="2" 
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" 
+                    />
+                  </svg>
+                  {{ customVoiceValidation.message }}
                 </div>
               </div>
-            </button>
+              
+              <!-- 规则说明 -->
+              <div class="alert alert-info text-sm mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                  <div class="font-medium">音色ID规则：</div>
+                  <ul class="text-xs mt-1 space-y-1">
+                    <li>• 只能包含字母、数字、下划线(_)、连字符(-)、空格和括号</li>
+                    <li>• 支持全角和半角括号：() （）</li>
+                    <li>• 不能以数字开头</li>
+                    <li>• 长度在1-50个字符之间</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <!-- 确认按钮 -->
+              <button 
+                class="btn btn-primary btn-sm"
+                :disabled="!customVoiceValidation.isValid || customVoiceId.trim() === ''"
+                @click="confirmCustomVoice"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                确认使用此音色ID
+              </button>
+            </div>
           </div>
-          
-          <!-- 无搜索结果提示 -->
-          <div v-if="filteredVoices.length === 0" class="text-center py-8 text-base-content/50">
-            <div class="text-lg mb-2">😔</div>
-            <div>未找到匹配的音色</div>
-            <div class="text-sm mt-1">请尝试其他关键词</div>
+        </div>
+
+        <!-- 预设音色选择区域 -->
+        <div v-else>
+          <!-- 搜索框 -->
+          <div class="form-control mb-4">
+            <input 
+              type="text" 
+              class="input input-bordered w-full text-base" 
+              placeholder="搜索音色名称、ID或关键词..."
+              v-model="voiceSearchQuery"
+            >
+          </div>
+
+          <!-- 音色网格 -->
+          <div class="max-h-96 overflow-y-auto">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <button
+                v-for="voice in filteredVoices"
+                :key="voice.voice_id"
+                class="btn btn-outline text-left h-auto p-3"
+                :class="{ 'btn-primary': voice.voice_id === (editingVoiceIndex >= 0 ? timberWeights[editingVoiceIndex]?.voiceId : timberWeights[0]?.voiceId) }"
+                @click="selectVoice(voice.voice_id)"
+              >
+                <div class="flex flex-col items-start w-full">
+                  <div class="font-medium text-sm">{{ voice.voice_name }}</div>
+                  <div class="text-xs opacity-70 mt-1">{{ voice.voice_id }}</div>
+                  <div class="text-xs opacity-50 mt-1 flex flex-wrap gap-1">
+                    <span 
+                      v-for="keyword in voice.keywords.slice(0, 3)" 
+                      :key="keyword"
+                      class="badge badge-xs"
+                    >
+                      {{ keyword }}
+                    </span>
+                    <span v-if="voice.keywords.length > 3" class="text-xs">...</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+            
+            <!-- 无搜索结果提示 -->
+            <div v-if="filteredVoices.length === 0" class="text-center py-8 text-base-content/50">
+              <div class="text-lg mb-2">😔</div>
+              <div>未找到匹配的音色</div>
+              <div class="text-sm mt-1">请尝试其他关键词</div>
+            </div>
           </div>
         </div>
 
