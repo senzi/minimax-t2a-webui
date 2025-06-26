@@ -11,6 +11,16 @@ const audioBlob = ref(null)
 const progress = ref(0)
 const voiceSearchQuery = ref('')
 
+// 新增：字符使用量和费用相关
+const usageChars = ref(0)
+const receivedChunks = ref(0)
+const expectedChunks = ref(20) // 默认预估值
+
+// 内联提示相关
+const alertMessage = ref('')
+const alertType = ref('error') // 'error', 'warning', 'success', 'info'
+const showAlert = ref(false)
+
 // 配置数据
 const config = reactive({
   apiKey: '',
@@ -88,6 +98,16 @@ const filteredVoices = computed(() => {
   })
 })
 
+// 计算属性：费用估算
+const estimatedCost = computed(() => {
+  return ((usageChars.value / 10000) * 3.5).toFixed(2)
+})
+
+// 计算属性：进度描述
+const progressLabel = computed(() => {
+  return `正在处理第 ${receivedChunks.value} 块 / 预计 ${expectedChunks.value} 块`
+})
+
 // 页面初始化
 onMounted(() => {
   loadConfig()
@@ -142,28 +162,18 @@ function saveConfig() {
   }))
   showSettings.value = false
   // 显示保存成功提示
-  const toast = document.createElement('div')
-  toast.className = 'toast toast-top toast-end'
-  toast.innerHTML = `
-    <div class="alert alert-success">
-      <span>配置保存成功！</span>
-    </div>
-  `
-  document.body.appendChild(toast)
-  setTimeout(() => {
-    document.body.removeChild(toast)
-  }, 2000)
+  showInlineAlert('配置保存成功！', 'success')
 }
 
 // 开始合成
 async function startSynthesis() {
   if (!inputText.value.trim()) {
-    alert('请输入要合成的文本')
+    showInlineAlert('请输入要合成的文本', 'warning')
     return
   }
   
   if (!config.apiKey || !config.groupId) {
-    alert('请先配置 API Key 和 Group ID')
+    showInlineAlert('请先配置 API Key 和 Group ID', 'warning')
     showSettings.value = true
     return
   }
@@ -172,6 +182,18 @@ async function startSynthesis() {
   progress.value = 0
   audioUrl.value = ''
   audioBlob.value = null
+  
+  // 合成开始前，预估 usageChars 和 expectedChunks
+  const estimatedChars = estimateUsageCharacters(inputText.value)
+  usageChars.value = estimatedChars
+
+  const estimatedPerChunk = 16 // 平均每 16 字符一个数据块（由实际观测得出）
+  expectedChunks.value = Math.ceil(estimatedChars / estimatedPerChunk)
+  
+  // 重置接收块数计数器
+  receivedChunks.value = 0
+
+  console.log(`预测字符数: ${usageChars.value}，预计数据块: ${expectedChunks.value}`)
 
   try {
     const response = await fetch(`https://api.minimaxi.com/v1/t2a_v2?GroupId=${config.groupId}`, {
@@ -212,7 +234,6 @@ async function startSynthesis() {
     const decoder = new TextDecoder()
     const audioChunks = []
     let buffer = ''
-    const processedChunks = new Set() // 用于跟踪已处理的音频块
 
     while (true) {
       const { done, value } = await reader.read()
@@ -231,30 +252,34 @@ async function startSynthesis() {
             const jsonStr = line.slice(6).trim()
             if (jsonStr && jsonStr !== '{}' && jsonStr !== '[DONE]') {
               const data = JSON.parse(jsonStr)
+              
               if (data.data && data.data.audio) {
                 const hexString = data.data.audio
                 
-                // 使用音频数据的哈希值来检测重复
-                const chunkHash = hexString.substring(0, 32) // 使用前32个字符作为简单哈希
-                if (!processedChunks.has(chunkHash)) {
-                  processedChunks.add(chunkHash)
-                  
-                  // 将 hex 字符串转换为 Uint8Array
-                  const audioData = new Uint8Array(hexString.length / 2)
-                  for (let i = 0; i < hexString.length; i += 2) {
-                    audioData[i / 2] = parseInt(hexString.substr(i, 2), 16)
-                  }
-                  audioChunks.push(audioData)
-                  console.log(`添加音频块: ${audioChunks.length}, 大小: ${audioData.length}`)
-                } else {
-                  console.log('检测到重复音频块，已跳过')
+                // 将 hex 字符串转换为 Uint8Array
+                const audioData = new Uint8Array(hexString.length / 2)
+                for (let i = 0; i < hexString.length; i += 2) {
+                  audioData[i / 2] = parseInt(hexString.substr(i, 2), 16)
                 }
+                audioChunks.push(audioData)
+                
+                // 更新接收块数和进度
+                receivedChunks.value++
+                progress.value = Math.floor((receivedChunks.value / expectedChunks.value) * 100)
+                
+                console.log(`添加音频块: ${audioChunks.length}, 大小: ${audioData.length}`)
+              }
 
-                // 更新进度
-                if (data.data.status === 2) {
-                  progress.value = 100
-                } else {
-                  progress.value = Math.min(progress.value + 10, 90)
+              // 检查是否完成，提取使用字符数
+              if (data.data && data.data.status === 2) {
+                progress.value = 100
+                if (data.extra_info && typeof data.extra_info.usage_characters === 'number') {
+                  usageChars.value = data.extra_info.usage_characters
+
+                  // 基于经验字符密度修正预计块数
+                  const estimatedPerChunk = 16
+                  expectedChunks.value = Math.ceil(usageChars.value / estimatedPerChunk)
+                  console.log(`使用字符：${usageChars.value}，推算预计块数：${expectedChunks.value}`)
                 }
               }
 
@@ -278,19 +303,24 @@ async function startSynthesis() {
           if (data.data && data.data.audio) {
             const hexString = data.data.audio
             
-            // 使用相同的重复检测逻辑
-            const chunkHash = hexString.substring(0, 32)
-            if (!processedChunks.has(chunkHash)) {
-              processedChunks.add(chunkHash)
-              
-              const audioData = new Uint8Array(hexString.length / 2)
-              for (let i = 0; i < hexString.length; i += 2) {
-                audioData[i / 2] = parseInt(hexString.substr(i, 2), 16)
-              }
-              audioChunks.push(audioData)
-              console.log(`缓冲区添加音频块: ${audioChunks.length}, 大小: ${audioData.length}`)
-            } else {
-              console.log('缓冲区检测到重复音频块，已跳过')
+            const audioData = new Uint8Array(hexString.length / 2)
+            for (let i = 0; i < hexString.length; i += 2) {
+              audioData[i / 2] = parseInt(hexString.substr(i, 2), 16)
+            }
+            audioChunks.push(audioData)
+            receivedChunks.value++
+            console.log(`缓冲区添加音频块: ${audioChunks.length}, 大小: ${audioData.length}`)
+          }
+          
+          // 检查缓冲区数据是否包含完成状态和使用字符数
+          if (data.data && data.data.status === 2) {
+            if (data.extra_info && typeof data.extra_info.usage_characters === 'number') {
+              usageChars.value = data.extra_info.usage_characters
+
+              // 基于经验字符密度修正预计块数
+              const estimatedPerChunk = 16
+              expectedChunks.value = Math.ceil(usageChars.value / estimatedPerChunk)
+              console.log(`使用字符：${usageChars.value}，推算预计块数：${expectedChunks.value}`)
             }
           }
         }
@@ -299,7 +329,7 @@ async function startSynthesis() {
       }
     }
 
-    console.log(`总共处理了 ${audioChunks.length} 个音频块`)
+    console.log(`共接收到 ${receivedChunks.value} 块数据，预计总块数为 ${expectedChunks.value}`)
 
     // 合并所有音频块
     const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0)
@@ -317,7 +347,7 @@ async function startSynthesis() {
 
   } catch (error) {
     console.error('合成失败:', error)
-    alert('合成失败: ' + error.message)
+    showInlineAlert('合成失败: ' + error.message, 'error')
   } finally {
     isLoading.value = false
   }
@@ -369,6 +399,38 @@ function adjustTextareaHeight() {
 // 字符计数
 const charCount = computed(() => inputText.value.length)
 const isOverLimit = computed(() => charCount.value > maxChars)
+
+// 显示内联提示
+function showInlineAlert(message, type = 'error') {
+  alertMessage.value = message
+  alertType.value = type
+  showAlert.value = true
+  
+  // 自动隐藏提示（错误和警告类型保持更长时间）
+  const duration = type === 'error' || type === 'warning' ? 5000 : 3000
+  setTimeout(() => {
+    showAlert.value = false
+  }, duration)
+}
+
+// 隐藏内联提示
+function hideInlineAlert() {
+  showAlert.value = false
+}
+
+// 估算字符使用量（与官方计费规则一致：1汉字=2字符，其余=1字符）
+function estimateUsageCharacters(text) {
+  let count = 0
+  for (const ch of text) {
+    const code = ch.charCodeAt(0)
+    if (code >= 0x4e00 && code <= 0x9fa5) {
+      count += 2 // 汉字
+    } else {
+      count += 1 // 其他字符
+    }
+  }
+  return count
+}
 </script>
 
 <template>
@@ -543,6 +605,9 @@ const isOverLimit = computed(() => charCount.value > maxChars)
 
               <!-- 进度条 -->
               <div v-if="isLoading || progress > 0" class="mt-4">
+                <div v-if="isLoading || progress > 0" class="mb-2 text-sm text-base-content/60">
+                  {{ progressLabel }}
+                </div>
                 <div class="mb-2">
                   <span class="text-base">合成进度: {{ progress }}%</span>
                 </div>
@@ -562,6 +627,9 @@ const isOverLimit = computed(() => charCount.value > maxChars)
                         下载
                       </button>
                     </div>
+                    <div v-if="usageChars > 0" class="text-sm text-base-content/70 mb-2">
+                      实际使用字符：{{ usageChars }}，预估费用：¥{{ estimatedCost }}
+                    </div>
                     <audio controls class="w-full h-12" :src="audioUrl"></audio>
                   </div>
                 </div>
@@ -571,6 +639,44 @@ const isOverLimit = computed(() => charCount.value > maxChars)
         </div>
       </div>
 
+    </div>
+
+    <!-- 内联提示组件 -->
+    <div v-if="showAlert" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md px-4">
+      <div class="alert shadow-lg" 
+           :class="{
+             'alert-error': alertType === 'error',
+             'alert-warning': alertType === 'warning', 
+             'alert-success': alertType === 'success',
+             'alert-info': alertType === 'info'
+           }">
+        <div class="flex items-center justify-between w-full">
+          <div class="flex items-center">
+            <!-- 错误图标 -->
+            <svg v-if="alertType === 'error'" xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <!-- 警告图标 -->
+            <svg v-else-if="alertType === 'warning'" xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <!-- 成功图标 -->
+            <svg v-else-if="alertType === 'success'" xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <!-- 信息图标 -->
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span class="text-sm font-medium">{{ alertMessage }}</span>
+          </div>
+          <button class="btn btn-ghost btn-sm btn-circle ml-2" @click="hideInlineAlert">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 设置模态框 -->
