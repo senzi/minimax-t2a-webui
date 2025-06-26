@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@rollup/rollup-darwin-arm64": "^4.44.0",
     "@tailwindcss/vite": "^4.1.10",
     "daisyui": "^5.0.43",
     "tailwindcss": "^4.1.10",
