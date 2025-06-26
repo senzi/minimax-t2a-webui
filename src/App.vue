@@ -671,14 +671,14 @@ function estimateUsageCharacters(text) {
               </div>
 
               <!-- 语速 -->
-              <div class="form-control mb-6">
-                <label class="label py-3">
+              <div class="form-control mb-4">
+                <label class="label py-2">
                   <span class="label-text text-base">语速: {{ t2aConfig.speed }}</span>
                 </label>
                 <div class="px-3">
                   <input type="range" min="0.5" max="2.0" step="0.1" 
-                         class="range range-primary my-2" v-model.number="t2aConfig.speed">
-                  <div class="w-full flex justify-between text-sm px-2 mt-2">
+                         class="range range-primary my-1" v-model.number="t2aConfig.speed">
+                  <div class="w-full flex justify-between text-sm px-2 mt-1">
                     <span>0.5x</span>
                     <span>1.0x</span>
                     <span>2.0x</span>
@@ -687,14 +687,14 @@ function estimateUsageCharacters(text) {
               </div>
 
               <!-- 音量 -->
-              <div class="form-control mb-6">
-                <label class="label py-3">
+              <div class="form-control mb-4">
+                <label class="label py-2">
                   <span class="label-text text-base">音量: {{ t2aConfig.vol }}</span>
                 </label>
                 <div class="px-3">
                   <input type="range" min="0.1" max="10" step="0.1" 
-                         class="range range-primary my-2" v-model.number="t2aConfig.vol">
-                  <div class="w-full flex justify-between text-sm px-2 mt-2">
+                         class="range range-primary my-1" v-model.number="t2aConfig.vol">
+                  <div class="w-full flex justify-between text-sm px-2 mt-1">
                     <span>0.1</span>
                     <span>5.0</span>
                     <span>10</span>
@@ -703,14 +703,14 @@ function estimateUsageCharacters(text) {
               </div>
 
               <!-- 音高 -->
-              <div class="form-control mb-6">
-                <label class="label py-3">
+              <div class="form-control mb-4">
+                <label class="label py-2">
                   <span class="label-text text-base">音高: {{ t2aConfig.pitch }}</span>
                 </label>
                 <div class="px-3">
                   <input type="range" min="-12" max="12" step="1" 
-                         class="range range-primary my-2" v-model.number="t2aConfig.pitch">
-                  <div class="w-full flex justify-between text-sm px-2 mt-2">
+                         class="range range-primary my-1" v-model.number="t2aConfig.pitch">
+                  <div class="w-full flex justify-between text-sm px-2 mt-1">
                     <span>-12</span>
                     <span>0</span>
                     <span>+12</span>
