@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { marked } from 'marked'
 import systemVoices from './assets/voices/system_voice.json'
 
@@ -55,6 +55,10 @@ const inputText = ref('')
 const maxChars = 5000
 const textareaRef = ref(null)
 const isTextareaScrollable = ref(false)
+
+// 语音停顿控制
+const delayInput = ref('')
+const delayValidation = ref({ isValid: true, message: '' })
 
 // 模型选项
 const modelOptions = [
@@ -610,6 +614,37 @@ function hideInlineAlert() {
   showAlert.value = false
 }
 
+// 简化的插入功能，不做任何验证
+
+// 插入延迟标记到光标位置
+function insertDelayAtCursor() {
+  const textarea = textareaRef.value
+  if (!textarea) return
+  
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  
+  // 如果输入框为空，使用默认值1.0，否则直接使用输入的值
+  const delayValue = delayInput.value ? String(delayInput.value).trim() : '1.0'
+  const finalValue = delayValue || '1.0'
+  const delayText = `<#${finalValue}#>`
+  
+  // 插入延迟标记
+  const newText = inputText.value.substring(0, start) + delayText + inputText.value.substring(end)
+  inputText.value = newText
+  
+  // 重新设置光标位置到插入文本之后
+  nextTick(() => {
+    const newCursorPos = start + delayText.length
+    textarea.setSelectionRange(newCursorPos, newCursorPos)
+    textarea.focus()
+    adjustTextareaHeight()
+  })
+  
+  // 不清空输入框，保持用户输入的值
+  showInlineAlert('延迟标记插入成功！', 'success')
+}
+
 // 估算字符使用量（与官方计费规则一致：1汉字=2字符，其余=1字符）
 function estimateUsageCharacters(text) {
   let count = 0
@@ -854,6 +889,43 @@ async function openChangelog() {
                 </div>
               </div>
               
+              <!-- 语音停顿控制 -->
+              <div class="mb-4">
+                <div class="flex items-center gap-3">
+                  <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-base-content/80">语音停顿：</label>
+                    <div class="tooltip tooltip-bottom" data-tip="支持自定义文本与文本之间的语音时间间隔，格式：<#x#>，x为秒数(0.01-99.99)，最多两位小数">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/60 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-1">
+                    <input 
+                      type="number" 
+                      class="input input-bordered input-sm w-24 text-center"
+                      placeholder="1.0"
+                      min="0.01"
+                      max="99.99"
+                      step="0.01"
+                      v-model="delayInput"
+                      @keyup.enter="insertDelayAtCursor"
+                    >
+                    <span class="text-sm text-base-content/70">秒</span>
+                    <button 
+                      class="btn btn-primary btn-sm"
+                      @click="insertDelayAtCursor"
+                      title="在光标位置插入延迟标记"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      插入
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
               <textarea 
                 ref="textareaRef"
                 class="textarea textarea-bordered w-full auto-resize-textarea text-lg leading-relaxed"
@@ -930,7 +1002,7 @@ async function openChangelog() {
             GitHub
           </a>
           <span class="text-base-content/60">•</span>
-          <span class="text-base-content/70">v1.0.3</span>
+          <span class="text-base-content/70">v1.0.4</span>
           <span class="text-base-content/60">•</span>
           <span class="text-base-content/70">MIT License</span>
           <span class="text-base-content/60">•</span>
